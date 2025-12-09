@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repo using a PAT
+      # 1️⃣ Checkout the repo using PAT
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.PAT_TOKEN }}
-          persist-credentials: false  # prevents using default GITHUB_TOKEN
+          persist-credentials: false  # ensure we use PAT for git push
 
       # 2️⃣ Setup Python
       - uses: actions/setup-python@v5
@@ -39,4 +39,5 @@ jobs:
           git config user.email "github-actions@github.com"
           git add state.json
           git diff --cached --quiet || git commit -m "Update state"
-          git push
+          # Push using PAT in HTTPS URL
+          git push https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
