@@ -22,71 +22,91 @@ sent_ids = set(state.get("sent_ids", []))
 BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
 CHAT_ID = os.getenv("CHAT_ID") or "YOUR_CHAT_ID"
 
-# --- Fetch Sakani API using http.client with headers ---
-conn = http.client.HTTPSConnection("sakani.sa")
-headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)"
-}
+def send_telegram(text):
+    """Send a message to Telegram."""
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}
+        resp = requests.post(url, data=payload)
+        if resp.status_code != 200:
+            print("❌ Telegram error:", resp.text)
+    except Exception as e:
+        print("❌ Failed to send Telegram message:", e)
 
-conn.request(
-    "GET",
-    "/marketplaceApi/search/v3/location?filter[marketplace_purpose]=buy&filter[product_types]=lands&filter[target_segment_info]=beneficiary&filter[land_type]=moh_lands&filter[mode]=maps",
-    headers=headersList
-)
-response = conn.getresponse()
-result = response.read()
-conn.close()
-
-# Parse JSON safely
+# --- Fetch Sakani API ---
 try:
-    data = json.loads(result.decode("utf-8"))
-except json.JSONDecodeError:
-    print("❌ Failed to parse JSON. Response might be empty or blocked.")
-    print("Response content:", result.decode("utf-8"))
-    data = {"data": []}
+    conn = http.client.HTTPSConnection("sakani.sa")
+    headersList = {
+        "Accept": "*/*",
+        "User-Agent": "Mozilla/5.0"
+    }
 
-# --- Send Telegram messages ---
+    conn.request(
+        "GET",
+        "/marketplaceApi/search/v3/location?filter[marketplace_purpose]=buy&filter[product_types]=lands&filter[target_segment_info]=beneficiary&filter[land_type]=moh_lands&filter[mode]=maps",
+        headers=headersList
+    )
+
+    response = conn.getresponse()
+    result = response.read()
+    conn.close()
+
+    try:
+        data = json.loads(result.decode("utf-8"))
+    except json.JSONDecodeError:
+        data = {"data": []}
+        send_telegram("⚠️ <b>Bot ran, but API response was invalid or empty.</b>")
+        print("❌ JSON decode error.")
+        print("Response content:", result.decode("utf-8"))
+
+except Exception as e:
+    send_telegram(f"❌ <b>Bot error fetching Sakani API:</b> {e}")
+    raise SystemExit()
+
+# --- Process results ---
 new_ids = []
+items = data.get("data", [])
 
-for item in data.get("data", []):
-    item_id = item.get("id")
-    if item_id not in sent_ids:
-        attributes = item.get("attributes", {})
-        project_name = attributes.get("project_name", "غير معروف")
-        min_price = attributes.get("min_non_bene_price", 0)
-        project_number = item_id.replace("project_", "")
-        project_link = f"https://sakani.sa/app/land-projects/{project_number}"
+if not items:
+    send_telegram("ℹ️ <b>Bot run complete — No projects available at this time.</b>")
+    print("No items found in API response.")
+else:
+    for item in items:
+        item_id = item.get("id")
+        if item_id not in sent_ids:
+            attributes = item.get("attributes", {})
+            project_name = attributes.get("project_name", "غير معروف")
+            min_price = attributes.get("min_non_bene_price", 0)
+            project_number = item_id.replace("project_", "")
+            project_link = f"https://sakani.sa/app/land-projects/{project_number}"
 
-        # Telegram message in Arabic (TEXT ONLY)
-        message_text = (
-            f"📢 مشروع جديد: {project_name}\n"
-            f"💰 السعر الابتدائي: {min_price}\n"
-            f"🌐 الرابط: {project_link}"
-        )
+            # User-friendly Telegram message
+            message_text = (
+                f"🏡 <b>{project_name}</b>\n"
+                f"💰 السعر الابتدائي: <b>{min_price} ريال</b>\n"
+                f"🔗 <a href='{project_link}'>رابط المشروع</a>"
+            )
 
-        try:
-            telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-            payload = {"chat_id": CHAT_ID, "text": message_text}
-            telegram_resp = requests.post(telegram_url, data=payload)
+            try:
+                telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                payload = {"chat_id": CHAT_ID, "text": message_text, "parse_mode": "HTML"}
+                telegram_resp = requests.post(telegram_url, data=payload)
 
-            if telegram_resp.status_code == 200:
-                print(f"✅ Message sent for project ID: {item_id}")
-                new_ids.append(item_id)
-            else:
-                try:
-                    error_info = telegram_resp.json()
-                except Exception:
-                    error_info = telegram_resp.text
-                print(f"❌ Failed to send message for project ID: {item_id}. Status: {telegram_resp.status_code}, Response: {error_info}")
+                if telegram_resp.status_code == 200:
+                    print(f"✅ Message sent for project ID: {item_id}")
+                    new_ids.append(item_id)
+                else:
+                    print(f"❌ Telegram failed for {item_id}: {telegram_resp.text}")
 
-        except Exception as e:
-            print(f"❌ Exception sending message for project ID: {item_id}: {e}")
+            except Exception as e:
+                print(f"❌ Exception sending Telegram message for {item_id}: {e}")
 
-# Update state
+# --- Save new state and send summary ---
 if new_ids:
     state["sent_ids"] = list(sent_ids.union(new_ids))
     save_state(state)
-    print(f"✅ State updated with project IDs: {new_ids}")
+    send_telegram(f"✔️ <b>Bot run complete — {len(new_ids)} new project(s) sent!</b>")
+    print("State updated.")
 else:
-    print("No new projects to send.")
+    send_telegram("ℹ️ <b>Bot run complete — No new projects found.</b>")
+    print("No new projects.")
