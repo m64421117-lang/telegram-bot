@@ -63,7 +63,7 @@ for item in data.get("data", []):
         message_text = f"📢 مشروع جديد: {project_name}\n💰 السعر الابتدائي: {min_price}\n🌐 الرابط: {project_link}"
 
         try:
-            if banner_url:
+            if banner_url and banner_url.startswith("http"):
                 # Send with photo
                 telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
                 payload = {"chat_id": CHAT_ID, "photo": banner_url, "caption": message_text}
@@ -78,7 +78,13 @@ for item in data.get("data", []):
                 print(f"✅ Message sent for project ID: {item_id}")
                 new_ids.append(item_id)
             else:
-                print(f"❌ Failed to send message for project ID: {item_id}. Status: {telegram_resp.status_code}")
+                # Try to get detailed Telegram error
+                try:
+                    error_info = telegram_resp.json()
+                except Exception:
+                    error_info = telegram_resp.text
+                print(f"❌ Failed to send message for project ID: {item_id}. Status: {telegram_resp.status_code}, Response: {error_info}")
+
         except Exception as e:
             print(f"❌ Exception sending message for project ID: {item_id}: {e}")
 
