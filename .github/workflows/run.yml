@@ -27,7 +27,7 @@ jobs:
 
       # 4️⃣ Run the bot script
       - name: Run Sakani Telegram Bot
-        run: python local_test_bot.py
+        run: python script.py
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
