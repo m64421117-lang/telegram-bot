@@ -19,8 +19,8 @@ def save_state(state):
 state = load_state()
 sent_ids = set(state.get("sent_ids", []))
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
+CHAT_ID = os.getenv("CHAT_ID") or "YOUR_CHAT_ID"
 
 # --- Fetch Sakani API using http.client with headers ---
 conn = http.client.HTTPSConnection("sakani.sa")
@@ -59,18 +59,28 @@ for item in data.get("data", []):
         project_link = f"https://sakani.sa/app/land-projects/{project_number}"
         banner_url = attributes.get("banner_url")
 
+        # Telegram message in Arabic
         message_text = f"📢 مشروع جديد: {project_name}\n💰 السعر الابتدائي: {min_price}\n🌐 الرابط: {project_link}"
 
-        telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-        payload = {"chat_id": CHAT_ID, "photo": banner_url, "caption": message_text}
+        try:
+            if banner_url:
+                # Send with photo
+                telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+                payload = {"chat_id": CHAT_ID, "photo": banner_url, "caption": message_text}
+                telegram_resp = requests.post(telegram_url, data=payload)
+            else:
+                # Send as text only
+                telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+                payload = {"chat_id": CHAT_ID, "text": message_text}
+                telegram_resp = requests.post(telegram_url, data=payload)
 
-        telegram_resp = requests.post(telegram_url, data=payload)
-
-        if telegram_resp.status_code == 200:
-            print(f"✅ Message sent for project ID: {item_id}")
-            new_ids.append(item_id)
-        else:
-            print(f"❌ Failed to send message for project ID: {item_id}. Status: {telegram_resp.status_code}")
+            if telegram_resp.status_code == 200:
+                print(f"✅ Message sent for project ID: {item_id}")
+                new_ids.append(item_id)
+            else:
+                print(f"❌ Failed to send message for project ID: {item_id}. Status: {telegram_resp.status_code}")
+        except Exception as e:
+            print(f"❌ Exception sending message for project ID: {item_id}: {e}")
 
 # Update state
 if new_ids:

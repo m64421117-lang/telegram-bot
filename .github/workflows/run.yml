@@ -10,8 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repo
+      # 1️⃣ Checkout the repo using a PAT
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          persist-credentials: false  # prevents using default GITHUB_TOKEN
 
       # 2️⃣ Setup Python
       - uses: actions/setup-python@v5
@@ -22,14 +25,14 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      # 4️⃣ Run the script
+      # 4️⃣ Run the bot script
       - name: Run Sakani Telegram Bot
         run: python local_test_bot.py
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
 
-      # 5️⃣ Commit state.json only if changed
+      # 5️⃣ Commit updated state.json
       - name: Commit state file
         run: |
           git config user.name "github-actions"
