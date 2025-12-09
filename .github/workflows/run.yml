@@ -8,28 +8,32 @@ on:
 jobs:
   run-script:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
+      # 1️⃣ Checkout the repo
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
+      # 2️⃣ Setup Python
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      - run: pip install requests
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: pip install requests
 
-      - run: python script.py
+      # 4️⃣ Run the script
+      - name: Run Sakani Telegram Bot
+        run: python local_test_bot.py
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
 
-      - run: |
+      # 5️⃣ Commit state.json only if changed
+      - name: Commit state file
+        run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add state.json
-          git commit -m "Update state" || echo "No changes"
+          git diff --cached --quiet || git commit -m "Update state"
           git push

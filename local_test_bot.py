@@ -19,8 +19,8 @@ def save_state(state):
 state = load_state()
 sent_ids = set(state.get("sent_ids", []))
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+BOT_TOKEN = "7999213986:AAE4i33rKw3wfvFs7ITxh3Cx4xCGUyjFzec"
+CHAT_ID = "1990112196"
 
 # --- Fetch data from Sakani API using http.client ---
 conn = http.client.HTTPSConnection("sakani.sa")
