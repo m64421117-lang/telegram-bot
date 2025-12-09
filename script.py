@@ -19,8 +19,8 @@ def save_state(state):
 state = load_state()
 sent_ids = set(state.get("sent_ids", []))
 
-BOT_TOKEN = os.getenv("BOT_TOKEN") or "YOUR_BOT_TOKEN"
-CHAT_ID = os.getenv("CHAT_ID") or "YOUR_CHAT_ID"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
 def send_telegram(text):
     """Send a message to Telegram."""
@@ -37,10 +37,9 @@ def send_telegram(text):
 try:
     conn = http.client.HTTPSConnection("sakani.sa")
     headersList = {
-        "Accept": "*/*",
-        "User-Agent": "Mozilla/5.0"
+    "Accept": "*/*",
+    "User-Agent": "Thunder Client (https://www.thunderclient.com)" 
     }
-
     conn.request(
         "GET",
         "/marketplaceApi/search/v3/location?filter[marketplace_purpose]=buy&filter[product_types]=lands&filter[target_segment_info]=beneficiary&filter[land_type]=moh_lands&filter[mode]=maps",
@@ -58,6 +57,7 @@ try:
         send_telegram("⚠️ <b>Bot ran, but API response was invalid or empty.</b>")
         print("❌ JSON decode error.")
         print("Response content:", result.decode("utf-8"))
+        raise SystemExit()
 
 except Exception as e:
     send_telegram(f"❌ <b>Bot error fetching Sakani API:</b> {e}")
@@ -70,20 +70,24 @@ items = data.get("data", [])
 if not items:
     send_telegram("ℹ️ <b>Bot run complete — No projects available at this time.</b>")
     print("No items found in API response.")
+    raise SystemExit()
+
 else:
     for item in items:
         item_id = item.get("id")
         if item_id not in sent_ids:
             attributes = item.get("attributes", {})
             project_name = attributes.get("project_name", "غير معروف")
-            min_price = attributes.get("min_non_bene_price", 0)
+            min_price = attributes.get("min_non_bene_price", "غير معروف")
+            if min_price == 0: min_price = "غير معروف"
+            else: min_price = f"{int(min_price):,} ريال"
             project_number = item_id.replace("project_", "")
             project_link = f"https://sakani.sa/app/land-projects/{project_number}"
 
             # User-friendly Telegram message
             message_text = (
                 f"🏡 <b>{project_name}</b>\n"
-                f"💰 السعر الابتدائي: <b>{min_price} ريال</b>\n"
+                f"💰 السعر الابتدائي: <b>{min_price}</b>\n"
                 f"🔗 <a href='{project_link}'>رابط المشروع</a>"
             )
 
@@ -105,7 +109,6 @@ else:
 if new_ids:
     state["sent_ids"] = list(sent_ids.union(new_ids))
     save_state(state)
-    send_telegram(f"✔️ <b>Bot run complete — {len(new_ids)} new project(s) sent!</b>")
     print("State updated.")
 else:
     send_telegram("ℹ️ <b>Bot run complete — No new projects found.</b>")
