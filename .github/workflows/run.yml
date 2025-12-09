@@ -2,7 +2,7 @@ name: Send Telegram Sakani Updates
 
 on:
   schedule:
-    - cron: "*/20 * * * *"  # every 20 minutes
+    - cron: "*/60 * * * *"  # every 60 minutes
   workflow_dispatch:
 
 jobs:
