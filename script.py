@@ -15,14 +15,14 @@ def save_state(state):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
-# Load state
+# Load previous state
 state = load_state()
 sent_ids = set(state.get("sent_ids", []))
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# --- Fetch data from Sakani using http.client with working headers ---
+# --- Fetch Sakani API using http.client with headers ---
 conn = http.client.HTTPSConnection("sakani.sa")
 headersList = {
     "Accept": "*/*",
@@ -42,10 +42,11 @@ conn.close()
 try:
     data = json.loads(result.decode("utf-8"))
 except json.JSONDecodeError:
-    print("Failed to parse JSON. Response was empty or blocked.")
+    print("❌ Failed to parse JSON. Response might be empty or blocked.")
+    print("Response content:", result.decode("utf-8"))
     data = {"data": []}
 
-# --- Send Telegram messages using requests ---
+# --- Send Telegram messages ---
 new_ids = []
 
 for item in data.get("data", []):
