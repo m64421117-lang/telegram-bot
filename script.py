@@ -57,28 +57,23 @@ for item in data.get("data", []):
         min_price = attributes.get("min_non_bene_price", 0)
         project_number = item_id.replace("project_", "")
         project_link = f"https://sakani.sa/app/land-projects/{project_number}"
-        banner_url = attributes.get("banner_url")
 
-        # Telegram message in Arabic
-        message_text = f"📢 مشروع جديد: {project_name}\n💰 السعر الابتدائي: {min_price}\n🌐 الرابط: {project_link}"
+        # Telegram message in Arabic (TEXT ONLY)
+        message_text = (
+            f"📢 مشروع جديد: {project_name}\n"
+            f"💰 السعر الابتدائي: {min_price}\n"
+            f"🌐 الرابط: {project_link}"
+        )
 
         try:
-            if banner_url and banner_url.startswith("http"):
-                # Send with photo
-                telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-                payload = {"chat_id": CHAT_ID, "photo": banner_url, "caption": message_text}
-                telegram_resp = requests.post(telegram_url, data=payload)
-            else:
-                # Send as text only
-                telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-                payload = {"chat_id": CHAT_ID, "text": message_text}
-                telegram_resp = requests.post(telegram_url, data=payload)
+            telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            payload = {"chat_id": CHAT_ID, "text": message_text}
+            telegram_resp = requests.post(telegram_url, data=payload)
 
             if telegram_resp.status_code == 200:
                 print(f"✅ Message sent for project ID: {item_id}")
                 new_ids.append(item_id)
             else:
-                # Try to get detailed Telegram error
                 try:
                     error_info = telegram_resp.json()
                 except Exception:
