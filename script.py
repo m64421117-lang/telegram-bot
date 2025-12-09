@@ -15,37 +15,34 @@ def save_state(state):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
-# Load previous state
+# Load state
 state = load_state()
 sent_ids = set(state.get("sent_ids", []))
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# --- Fetch data from Sakani API using http.client ---
+# --- Fetch data from Sakani using http.client with working headers ---
 conn = http.client.HTTPSConnection("sakani.sa")
 headersList = {
     "Accept": "*/*",
     "User-Agent": "Thunder Client (https://www.thunderclient.com)"
 }
-payload = ""
 
 conn.request(
     "GET",
     "/marketplaceApi/search/v3/location?filter[marketplace_purpose]=buy&filter[product_types]=lands&filter[target_segment_info]=beneficiary&filter[land_type]=moh_lands&filter[mode]=maps",
-    payload,
-    headersList
+    headers=headersList
 )
-
 response = conn.getresponse()
 result = response.read()
 conn.close()
 
-# Parse JSON
+# Parse JSON safely
 try:
     data = json.loads(result.decode("utf-8"))
 except json.JSONDecodeError:
-    print("Failed to parse JSON from Sakani API")
+    print("Failed to parse JSON. Response was empty or blocked.")
     data = {"data": []}
 
 # --- Send Telegram messages using requests ---
@@ -57,21 +54,14 @@ for item in data.get("data", []):
         attributes = item.get("attributes", {})
         project_name = attributes.get("project_name", "غير معروف")
         min_price = attributes.get("min_non_bene_price", 0)
-
-        # Remove "project_" prefix for the link
         project_number = item_id.replace("project_", "")
         project_link = f"https://sakani.sa/app/land-projects/{project_number}"
+        banner_url = attributes.get("banner_url")
 
-        # Telegram message in Arabic
-        banner_url = attributes.get("banner_url")  # get image URL from API
         message_text = f"📢 مشروع جديد: {project_name}\n💰 السعر الابتدائي: {min_price}\n🌐 الرابط: {project_link}"
 
         telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-        payload = {
-            "chat_id": CHAT_ID,
-            "photo": banner_url,
-            "caption": message_text
-        }
+        payload = {"chat_id": CHAT_ID, "photo": banner_url, "caption": message_text}
 
         telegram_resp = requests.post(telegram_url, data=payload)
 
@@ -79,7 +69,7 @@ for item in data.get("data", []):
             print(f"✅ Message sent for project ID: {item_id}")
             new_ids.append(item_id)
         else:
-            print(f"❌ Failed to send message for project ID: {item_id}. Status code: {telegram_resp.status_code}")
+            print(f"❌ Failed to send message for project ID: {item_id}. Status: {telegram_resp.status_code}")
 
 # Update state
 if new_ids:
