@@ -37,8 +37,13 @@ def send_telegram(text):
 try:
     conn = http.client.HTTPSConnection("sakani.sa")
     headersList = {
-    "Accept": "*/*",
-    "User-Agent": "Thunder Client (https://www.thunderclient.com)" 
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+        "Referer": "https://sakani.sa/app/marketplace?marketplace_purpose=buy&nhc=false&product_types=lands&target_segment_info=beneficiary&land_type=all",
+        "Platform": "web",
+        "Visitor-Id": "29b7f97eb471f58649fb45a0ed260d96"
+        # "Cookie": "<your cookies here>"
     }
     conn.request(
         "GET",
@@ -60,6 +65,7 @@ try:
         raise SystemExit()
 
 except Exception as e:
+    print(f"❌ Error fetching Sakani API: {e}")
     send_telegram(f"❌ <b>Bot error fetching Sakani API:</b> {e}")
     raise SystemExit()
 
