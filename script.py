@@ -7,7 +7,7 @@ STATE_FILE = "state.json"
 
 def load_state():
     if not os.path.exists(STATE_FILE):
-        return {"sent_ids": []}
+        return {"sent_ids": {}}
     with open(STATE_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -17,11 +17,11 @@ def save_state(state):
 
 # Load previous state
 state = load_state()
-sent_ids = set(state.get("sent_ids", []))
+sent_ids = state.get("sent_ids", {})  # dict: {project_id: version}
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")  # original chat
-EXTRA_CHAT_ID = "855097157"    # new chat ID
+CHAT_ID = os.getenv("CHAT_ID")
+EXTRA_CHAT_ID = "855097157"
 
 
 def send_to_all_chats(text):
@@ -31,13 +31,18 @@ def send_to_all_chats(text):
     for cid in chat_ids:
         try:
             url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-            payload = {"chat_id": cid, "text": text, "parse_mode": "HTML"}
+            payload = {
+                "chat_id": cid,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": False
+            }
             resp = requests.post(url, data=payload)
 
             if resp.status_code != 200:
-                print(f"❌ Telegram error for chat {cid}:", resp.text)
+                print(f"❌ Telegram error for chat {cid}: {resp.text}")
         except Exception as e:
-            print(f"❌ Failed to send message to chat {cid}:", e)
+            print(f"❌ Failed to send message to chat {cid}: {e}")
 
 
 # --- Fetch Sakani API ---
@@ -62,66 +67,64 @@ try:
     result = response.read()
     conn.close()
 
-    try:
-        data = json.loads(result.decode("utf-8"))
-    except json.JSONDecodeError:
-        data = {"data": []}
-        send_to_all_chats("⚠️ <b>Bot ran, but API response was invalid or empty.</b>")
-        print("❌ JSON decode error.")
-        print("Response content:", result.decode("utf-8"))
-        raise SystemExit()
+    data = json.loads(result.decode("utf-8"))
 
 except Exception as e:
     print(f"❌ Error fetching Sakani API: {e}")
-    send_to_all_chats(f"❌ <b>Bot error fetching Sakani API:</b> {e}")
+    send_to_all_chats("⚠️ <b>Bot ran, but API response was invalid or empty.</b>")
     raise SystemExit()
 
 
 # --- Process results ---
-new_ids = []
 items = data.get("data", [])
+updated = False
 
 if not items:
     send_to_all_chats("ℹ️ <b>Bot run complete — No projects available at this time.</b>")
-    print("No items found in API response.")
+    print("No items found.")
     raise SystemExit()
+for item in items:
+    item_id = item.get("id")
+    attributes = item.get("attributes", {})
 
-else:
-    for item in items:
-        item_id = item.get("id")
-        if item_id not in sent_ids:
-            attributes = item.get("attributes", {})
-            project_name = attributes.get("project_name", "غير معروف")
-            min_price = attributes.get("min_non_bene_price", "غير معروف")
+    current_version = attributes.get("version")
+    saved_version = sent_ids.get(item_id)
 
-            if min_price == 0:
-                min_price = "غير معروف"
-            else:
-                min_price = f"{int(min_price):,} ريال"
+    # Skip if same project & same version
+    if saved_version == current_version:
+        continue
 
-            project_number = item_id.replace("project_", "")
-            project_link = f"https://sakani.sa/app/land-projects/{project_number}"
+    project_name = attributes.get("project_name", "غير معروف")
+    min_price = attributes.get("min_non_bene_price", 0)
 
-            message_text = (
-                f"🏡 <b>{project_name}</b>\n"
-                f"💰 السعر الابتدائي: <b>{min_price}</b>\n"
-                f"🔗 <a href='{project_link}'>رابط المشروع</a>"
-            )
+    if not min_price:
+        min_price = "غير معروف"
+    else:
+        min_price = f"{int(min_price):,} ريال"
 
-            try:
-                send_to_all_chats(message_text)
-                print(f"✅ Message sent for project ID: {item_id}")
-                new_ids.append(item_id)
+    project_number = item_id.replace("project_", "")
+    project_link = f"https://sakani.sa/app/land-projects/{project_number}"
 
-            except Exception as e:
-                print(f"❌ Exception sending Telegram message for {item_id}: {e}")
+    message_text = (
+        f"🏡 <b>{project_name}</b>\n"
+        f"💰 السعر الابتدائي: <b>{min_price}</b>\n"
+        f"🔗 <a href='{project_link}'>رابط المشروع</a>"
+    )
+    try:
+        send_to_all_chats(message_text)
+        print(f"✅ Sent update for {item_id} (version {current_version})")
+        sent_ids[item_id] = current_version
+    except Exception as e:
+        print(f"❌ Exception sending Telegram message for {item_id}: {e}")
+        continue
 
+    updated = True
 
-# --- Save new state and send summary ---
-if new_ids:
-    state["sent_ids"] = list(sent_ids.union(new_ids))
+# --- Save state ---
+if updated:
+    state["sent_ids"] = sent_ids
     save_state(state)
-    print("State updated.")
+    print("✅ State updated.")
 else:
-    send_to_all_chats("ℹ️ <b>Bot run complete — No new projects found.</b>")
-    print("No new projects.")
+    send_to_all_chats("ℹ️ <b>Bot run complete — No new or updated projects.</b>")
+    print("No changes detected.")
