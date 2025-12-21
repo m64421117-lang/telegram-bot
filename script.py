@@ -7,7 +7,7 @@ STATE_FILE = "state.json"
 
 def load_state():
     if not os.path.exists(STATE_FILE):
-        return {"sent_ids": {}}
+        return {"sent_ids": []}
     with open(STATE_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -17,7 +17,7 @@ def save_state(state):
 
 # Load state
 state = load_state()
-sent_ids = state.get("sent_ids", {})  # { project_id: [versions] }
+sent_ids = set(state.get("sent_ids", []))  # ONLY project IDs
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -77,7 +77,7 @@ except Exception as e:
 
 # --- Process results ---
 items = data.get("data", [])
-updated = False
+new_ids = []
 
 if not items:
     send_to_all_chats("ℹ️ <b>Bot run complete — No projects available at this time.</b>")
@@ -87,20 +87,10 @@ if not items:
 for item in items:
     item_id = item.get("id")
     attributes = item.get("attributes", {})
-    current_version = attributes.get("version")
 
-    if not item_id or not current_version:
-        continue
+    if not item_id or item_id in sent_ids:
+        continue  # already sent
 
-    # Init project entry if not exists
-    if item_id not in sent_ids:
-        sent_ids[item_id] = []
-
-    # Skip if this version already sent
-    if current_version in sent_ids[item_id]:
-        continue
-
-    # --- New or updated project ---
     project_name = attributes.get("project_name", "غير معروف")
     min_price = attributes.get("min_non_bene_price", 0)
 
@@ -120,17 +110,17 @@ for item in items:
 
     try:
         send_to_all_chats(message_text)
-        print(f"✅ Sent {item_id} | version {current_version}")
-        sent_ids[item_id].append(current_version)
-        updated = True
+        print(f"✅ Sent project: {item_id}")
+        new_ids.append(item_id)
     except Exception as e:
-        print(f"❌ Failed to send message for {item_id}: {e}")
+        print(f"❌ Failed to send {item_id}: {e}")
+
 
 # --- Save state ---
-if updated:
-    state["sent_ids"] = sent_ids
+if new_ids:
+    sent_ids.update(new_ids)
+    state["sent_ids"] = list(sent_ids)
     save_state(state)
     print("✅ State updated.")
 else:
-    send_to_all_chats("ℹ️ <b>Bot run complete — No new or updated projects.</b>")
-    print("No changes detected.")
+    send_to_all_chats("ℹ️ <b>No new projects found.</b>")
