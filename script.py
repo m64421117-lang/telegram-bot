@@ -15,9 +15,9 @@ def save_state(state):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
-# Load previous state
+# Load state
 state = load_state()
-sent_ids = state.get("sent_ids", {})  # dict: {project_id: version}
+sent_ids = state.get("sent_ids", {})  # { project_id: [versions] }
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -83,17 +83,24 @@ if not items:
     send_to_all_chats("ℹ️ <b>Bot run complete — No projects available at this time.</b>")
     print("No items found.")
     raise SystemExit()
+
 for item in items:
     item_id = item.get("id")
     attributes = item.get("attributes", {})
-
     current_version = attributes.get("version")
-    saved_version = sent_ids.get(item_id)
 
-    # Skip if same project & same version
-    if saved_version == current_version:
+    if not item_id or not current_version:
         continue
 
+    # Init project entry if not exists
+    if item_id not in sent_ids:
+        sent_ids[item_id] = []
+
+    # Skip if this version already sent
+    if current_version in sent_ids[item_id]:
+        continue
+
+    # --- New or updated project ---
     project_name = attributes.get("project_name", "غير معروف")
     min_price = attributes.get("min_non_bene_price", 0)
 
@@ -110,15 +117,14 @@ for item in items:
         f"💰 السعر الابتدائي: <b>{min_price}</b>\n"
         f"🔗 <a href='{project_link}'>رابط المشروع</a>"
     )
+
     try:
         send_to_all_chats(message_text)
-        print(f"✅ Sent update for {item_id} (version {current_version})")
-        sent_ids[item_id] = current_version
+        print(f"✅ Sent {item_id} | version {current_version}")
+        sent_ids[item_id].append(current_version)
+        updated = True
     except Exception as e:
-        print(f"❌ Exception sending Telegram message for {item_id}: {e}")
-        continue
-
-    updated = True
+        print(f"❌ Failed to send message for {item_id}: {e}")
 
 # --- Save state ---
 if updated:
