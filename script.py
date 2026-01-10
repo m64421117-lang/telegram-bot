@@ -52,14 +52,14 @@ try:
         "Accept": "application/json",
         "Content-Type": "application/json",
         "User-Agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-        "Referer": "https://sakani.sa/app/marketplace?marketplace_purpose=buy&nhc=false&product_types=lands&target_segment_info=beneficiary&land_type=all",
+        "Referer": "https://sakani.sa/",
         "Platform": "web",
         "Visitor-Id": "29b7f97eb471f58649fb45a0ed260d96"
     }
 
     conn.request(
         "GET",
-        "/marketplaceApi/search/v3/location?filter[marketplace_purpose]=buy&filter[product_types]=lands&filter[target_segment_info]=beneficiary&filter[land_type]=moh_lands&filter[mode]=maps",
+        "/marketplaceApi/search/v3/location?filter[marketplace_purpose]=buy&filter[product_types]=lands&filter[target_segment_info]=beneficiary&filter[land_type]=moh_lands&filter[mode]=maps&sort=-publish_date",
         headers=headersList
     )
 
